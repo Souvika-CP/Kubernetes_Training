@@ -822,3 +822,214 @@ helm upgrade taskflow helm/taskflow -n taskflow-dev -f helm/taskflow/values.yaml
 |-|-------|
 | Email | `souvika@taskflow.local` |
 | Password | `Test1234!` |
+
+---
+
+---
+
+# APPENDIX B — MongoDB in Production: Should It Be Inside Kubernetes?
+
+## The Short Answer
+
+**In this training project, MongoDB runs as a Kubernetes StatefulSet inside the cluster. In real production, it almost always runs outside Kubernetes as a managed service.**
+
+This appendix explains why, and shows exactly what changes in the code to make the switch.
+
+---
+
+## What We Did (Training) vs What Production Looks Like
+
+```
+TRAINING (this project)                    PRODUCTION (real AKS)
+
+┌─────────────────────────────┐            ┌──────────────────────────┐
+│   Kubernetes Cluster        │            │   Kubernetes Cluster     │
+│                             │            │                          │
+│   API pods ──────────────►  │            │   API pods               │
+│                  mongodb-0  │            │        │                 │
+│                  (StatefulSet│            └────────│─────────────────┘
+│                  + 1Gi PVC) │                     │ connection string
+└─────────────────────────────┘                     ▼
+                                           ┌──────────────────────────┐
+                                           │  Azure Cosmos DB         │
+                                           │  or MongoDB Atlas        │
+                                           │  (fully managed)         │
+                                           └──────────────────────────┘
+```
+
+---
+
+## Why Not Run MongoDB Inside Kubernetes in Production?
+
+| Problem | What happens |
+|---------|-------------|
+| **You own operations** | Backups, failover, replication, patching, security — all your responsibility |
+| **StatefulSets are hard** | If a node dies, the PersistentVolumeClaim may get stuck on that node — Kubernetes won't remount it automatically |
+| **No built-in HA** | Our single `mongodb-0` pod is a single point of failure. A proper replica set needs 3 pods + a MongoDB Operator to manage elections |
+| **No point-in-time recovery** | You'd need to build your own backup solution from scratch |
+| **Storage is cluster-tied** | Delete the cluster carelessly and you lose your data |
+| **Engineering cost** | The time spent operating a self-hosted database almost always exceeds the cost of a managed service |
+
+> **Rule of thumb used in industry:**
+> Stateless workloads (APIs, frontends) belong in Kubernetes.
+> Stateful workloads (databases, queues, caches) belong outside it — in managed services.
+
+---
+
+## The Three Production Options
+
+### Option 1 — Azure Cosmos DB for MongoDB (Recommended for AKS)
+
+Microsoft's fully managed database with a MongoDB-compatible API. Native integration with Azure networking, RBAC, and Key Vault.
+
+**Pros:** No infrastructure to manage, automatic backups, built-in geo-replication, private endpoints, SLA-backed uptime
+**Cons:** Slightly different behaviour from native MongoDB on some advanced features (transactions, aggregation edge cases)
+
+**Pricing:** Pay per Request Unit (RU) — scales to zero when idle, or provisioned throughput for predictable workloads
+
+---
+
+### Option 2 — MongoDB Atlas
+
+MongoDB's own managed cloud service, available on Azure, AWS, and GCP.
+
+**Pros:** 100% MongoDB-compatible (it's the real thing), excellent tooling, free tier available, can run on Azure in the same region as your AKS cluster
+**Cons:** Third-party service (not Azure-native), network peering setup required for private connectivity
+
+**Pricing:** From ~$60/month for M10 cluster (3-node replica set, 2GB RAM)
+
+---
+
+### Option 3 — MongoDB Community Operator (Still in Kubernetes)
+
+If you genuinely must run MongoDB in-cluster, use the [MongoDB Community Operator](https://github.com/mongodb/mongodb-kubernetes-operator). It manages replica sets, rolling upgrades, and TLS automatically.
+
+**Pros:** Stays in Kubernetes, no external dependency
+**Cons:** Significant operational overhead — you still own backups, storage, and recovery. Only choose this if you have a dedicated platform team.
+
+---
+
+## What Changes in the Code
+
+This is the important part. **Almost nothing changes** — only the connection string in `values.prod.yaml`.
+
+The `MongoDB.Driver` in .NET does not care whether it connects to a pod in the same cluster, Cosmos DB, or Atlas. It reads the connection string. The repository pattern we built (`IProjectRepository`, `ITaskRepository`, etc.) means the database location is completely abstracted away from application code.
+
+---
+
+### Change 1 — `helm/taskflow/values.prod.yaml`
+
+```yaml
+# BEFORE (in-cluster StatefulSet)
+mongodb:
+  connectionString: "mongodb://admin:mongopassword@mongodb:27017/taskflow?authSource=admin"
+  databaseName: taskflow
+
+# AFTER — Azure Cosmos DB for MongoDB
+mongodb:
+  connectionString: "mongodb://taskflow:YOUR_KEY@taskflow.mongo.cosmos.azure.com:10255/taskflow?ssl=true&replicaSet=globaldb&retrywrites=false"
+  databaseName: taskflow
+
+# AFTER — MongoDB Atlas
+mongodb:
+  connectionString: "mongodb+srv://taskflowuser:YOUR_PASSWORD@cluster0.abc123.mongodb.net/taskflow?retryWrites=true&w=majority"
+  databaseName: taskflow
+```
+
+> The connection string is injected into the pod as a Kubernetes Secret environment variable (`MongoDb__ConnectionString`). In real AKS this secret value comes from Azure Key Vault at deploy time — it is never committed to git.
+
+---
+
+### Change 2 — Remove the MongoDB StatefulSet from Helm
+
+When using a managed service, you no longer deploy MongoDB into the cluster at all. Comment out or remove these files:
+
+```
+helm/taskflow/templates/mongodb-statefulset.yaml  ← delete or disable
+helm/taskflow/templates/mongodb-service.yaml      ← delete or disable
+k8s/mongodb/                                       ← no longer applied
+```
+
+Or guard them with a values flag:
+
+```yaml
+# values.prod.yaml
+mongodb:
+  deploy: false   # don't create StatefulSet — use external managed service
+```
+
+```yaml
+# helm/taskflow/templates/mongodb-statefulset.yaml
+{{- if .Values.mongodb.deploy }}
+apiVersion: apps/v1
+kind: StatefulSet
+...
+{{- end }}
+```
+
+---
+
+### Change 3 — Remove the MongoDB NetworkPolicy restriction
+
+The current NetworkPolicy blocks everything except the API pods from reaching `mongodb:27017`. When MongoDB is external, this rule no longer applies — the egress policy on API pods should instead allow outbound HTTPS/TCP to the managed service endpoint.
+
+```yaml
+# Updated API egress policy for external MongoDB
+egress:
+  - ports:
+      - protocol: TCP
+        port: 10255   # Cosmos DB for MongoDB port
+      - protocol: TCP
+        port: 27017   # Atlas port (if using VNet peering)
+      - protocol: TCP
+        port: 443     # HTTPS for Cosmos DB management
+  - ports:
+      - protocol: UDP
+        port: 53      # DNS — always required
+```
+
+---
+
+### Change 4 — Health Check Connection String
+
+The readiness and startup probes check MongoDB connectivity. No code change needed — `AspNetCore.HealthChecks.MongoDb` reads the same `MongoDb__ConnectionString` environment variable. It will automatically check the external service instead.
+
+```csharp
+// Program.cs — unchanged
+builder.Services.AddHealthChecks()
+    .AddMongoDb(
+        sp => sp.GetRequiredService<IMongoClient>(),
+        name: "mongodb",
+        tags: ["ready", "startup"]);
+```
+
+---
+
+## Side-by-Side Summary
+
+| | In-Cluster StatefulSet (this project) | Managed Service (production) |
+|--|--------------------------------------|------------------------------|
+| **Setup** | Automatic via Helm | Create service in Azure Portal / Atlas UI |
+| **Code changes** | None | None |
+| **Config changes** | None | Connection string in `values.prod.yaml` |
+| **Backups** | You build it | Automatic (daily + PITR) |
+| **High availability** | Single pod (SPOF) | Multi-region, automatic failover |
+| **Scaling** | Manual (`replicas:`) | Automatic (throughput-based) |
+| **Security** | NetworkPolicy + k8s Secret | Private endpoint + Azure AD / Key Vault |
+| **Cost** | Storage + node CPU/RAM | ~$60–200/month depending on size |
+| **Who operates it** | You | The cloud provider |
+
+---
+
+## Why We Used StatefulSet in This Project
+
+Running MongoDB as a StatefulSet was a deliberate training choice. It taught:
+
+- How StatefulSets differ from Deployments (stable identity, ordered scaling, per-pod PVCs)
+- How PersistentVolumeClaims and storage provisioners work
+- How headless services give databases stable DNS entries
+- How NetworkPolicy enforces pod-level firewall rules
+
+All of these concepts apply to any stateful workload in Kubernetes — not just MongoDB. The patterns transfer directly to running Redis, RabbitMQ, Elasticsearch, or any database in-cluster when that genuinely makes sense.
+
+The architecture was also designed from day one so the switch to a managed service requires changing **one line** — the connection string. That's the right way to build it.
