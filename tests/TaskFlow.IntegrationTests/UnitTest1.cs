@@ -1,10 +1,1 @@
-﻿namespace TaskFlow.IntegrationTests;
-
-public class UnitTest1
-{
-    [Fact]
-    public void Test1()
-    {
-
-    }
-}
+// Replaced by organised test classes — see Fixtures/, Helpers/, and test files in this project
