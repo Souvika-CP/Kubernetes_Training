@@ -1,0 +1,49 @@
+# ── .NET build output ─────────────────────────────────────────────────────────
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# ── .NET publish output ────────────────────────────────────────────────────────
+publish/
+out/
+
+# ── Secrets / local config overrides ─────────────────────────────────────────
+appsettings.local.json
+appsettings.*.local.json
+secrets.yaml
+*.pfx
+*.p12
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+.dockerenv
+
+# ── Kubernetes / Helm ─────────────────────────────────────────────────────────
+*.kubeconfig
+helm/taskflow/charts/
+helm/taskflow/Chart.lock
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+*.sln.DotSettings.user
+.vscode/settings.json
+.vscode/launch.json
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Test results ──────────────────────────────────────────────────────────────
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
