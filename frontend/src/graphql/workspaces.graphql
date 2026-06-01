@@ -1,0 +1,17 @@
+query GetWorkspaces {
+  workspaces {
+    id
+    name
+    ownerId
+    createdAt
+  }
+}
+
+mutation CreateWorkspace($input: CreateWorkspaceInput!) {
+  createWorkspace(input: $input) {
+    id
+    name
+    ownerId
+    createdAt
+  }
+}

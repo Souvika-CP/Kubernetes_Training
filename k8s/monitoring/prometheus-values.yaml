@@ -1,0 +1,48 @@
+alertmanager:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    # Watch ServiceMonitors in ALL namespaces (not just monitoring)
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    retention: 2h
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+grafana:
+  adminPassword: admin
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - grafana.local
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: web
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
+
+# Reduce noise from default recording rules for a training cluster
+defaultRules:
+  create: true
+  rules:
+    etcd: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false

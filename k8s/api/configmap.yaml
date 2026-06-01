@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: taskflow-config
+  namespace: taskflow-dev
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  MongoDb__DatabaseName: "taskflow"
+  Jwt__Issuer: "taskflow-api"
+  Jwt__Audience: "taskflow-clients"
+  Jwt__ExpiryMinutes: "60"

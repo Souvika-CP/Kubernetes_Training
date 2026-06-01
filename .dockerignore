@@ -1,0 +1,14 @@
+**/.git
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/node_modules
+frontend/dist
+**/*.user
+**/*.suo
+.dockerignore
+docker-compose*.yml
+k8s/
+helm/
+tests/

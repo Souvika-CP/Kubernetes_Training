@@ -1,0 +1,292 @@
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+type Query {
+  workspaces(
+    where: WorkspaceFilterInput @cost(weight: "10")
+    order: [WorkspaceSortInput!] @cost(weight: "10")
+  ): [Workspace!]! @cost(weight: "10")
+  workspace(id: String!): Workspace @cost(weight: "10")
+  projects(
+    workspaceId: String!
+    where: ProjectFilterInput @cost(weight: "10")
+    order: [ProjectSortInput!] @cost(weight: "10")
+  ): [Project!]! @cost(weight: "10")
+  project(id: String!): Project @cost(weight: "10")
+  tasks(
+    projectId: String!
+    where: TaskItemFilterInput @cost(weight: "10")
+    order: [TaskItemSortInput!] @cost(weight: "10")
+  ): [TaskItem!]! @cost(weight: "10")
+  task(id: String!): TaskItem @cost(weight: "10")
+}
+
+type Mutation {
+  createWorkspace(input: CreateWorkspaceInput!): Workspace! @cost(weight: "10")
+  createProject(input: CreateProjectInput!): Project! @cost(weight: "10")
+  updateProject(input: UpdateProjectInput!): Project! @cost(weight: "10")
+  deleteProject(id: String!): Boolean! @cost(weight: "10")
+  createTask(input: CreateTaskInput!): TaskItem! @cost(weight: "10")
+  updateTask(input: UpdateTaskInput!): TaskItem! @cost(weight: "10")
+  deleteTask(id: String!): Boolean! @cost(weight: "10")
+  addComment(input: AddCommentInput!): Comment! @cost(weight: "10")
+}
+
+type Subscription {
+  onTaskUpdated(projectId: String!): TaskItem!
+  onCommentAdded(taskId: String!): Comment!
+}
+
+type Comment {
+  id: String!
+  taskId: String!
+  body: String!
+  authorId: String!
+  createdAt: DateTime!
+}
+
+type Project {
+  id: String!
+  workspaceId: String!
+  name: String!
+  description: String!
+  status: ProjectStatus!
+  ownerId: String!
+  createdAt: DateTime!
+}
+
+type TaskItem {
+  id: String!
+  projectId: String!
+  title: String!
+  description: String!
+  status: TaskItemStatus!
+  priority: TaskPriority!
+  assigneeId: String
+  dueDate: DateTime
+  tags: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Workspace {
+  id: String!
+  name: String!
+  ownerId: String!
+  createdAt: DateTime!
+}
+
+input AddCommentInput {
+  taskId: String!
+  body: String!
+  authorId: String!
+}
+
+input CreateProjectInput {
+  workspaceId: String!
+  name: String!
+  description: String!
+  ownerId: String!
+}
+
+input CreateTaskInput {
+  projectId: String!
+  title: String!
+  description: String!
+  priority: TaskPriority!
+  assigneeId: String
+  dueDate: DateTime
+  tags: [String!]
+}
+
+input CreateWorkspaceInput {
+  name: String!
+  ownerId: String!
+}
+
+input DateTimeOperationFilterInput {
+  eq: DateTime @cost(weight: "10")
+  neq: DateTime @cost(weight: "10")
+  in: [DateTime] @cost(weight: "10")
+  nin: [DateTime] @cost(weight: "10")
+  gt: DateTime @cost(weight: "10")
+  ngt: DateTime @cost(weight: "10")
+  gte: DateTime @cost(weight: "10")
+  ngte: DateTime @cost(weight: "10")
+  lt: DateTime @cost(weight: "10")
+  nlt: DateTime @cost(weight: "10")
+  lte: DateTime @cost(weight: "10")
+  nlte: DateTime @cost(weight: "10")
+}
+
+input ListStringOperationFilterInput {
+  all: StringOperationFilterInput @cost(weight: "10")
+  none: StringOperationFilterInput @cost(weight: "10")
+  some: StringOperationFilterInput @cost(weight: "10")
+  any: Boolean @cost(weight: "10")
+}
+
+input ProjectFilterInput {
+  and: [ProjectFilterInput!]
+  or: [ProjectFilterInput!]
+  id: StringOperationFilterInput
+  workspaceId: StringOperationFilterInput
+  name: StringOperationFilterInput
+  description: StringOperationFilterInput
+  status: ProjectStatusOperationFilterInput
+  ownerId: StringOperationFilterInput
+  createdAt: DateTimeOperationFilterInput
+}
+
+input ProjectSortInput {
+  id: SortEnumType @cost(weight: "10")
+  workspaceId: SortEnumType @cost(weight: "10")
+  name: SortEnumType @cost(weight: "10")
+  description: SortEnumType @cost(weight: "10")
+  status: SortEnumType @cost(weight: "10")
+  ownerId: SortEnumType @cost(weight: "10")
+  createdAt: SortEnumType @cost(weight: "10")
+}
+
+input ProjectStatusOperationFilterInput {
+  eq: ProjectStatus @cost(weight: "10")
+  neq: ProjectStatus @cost(weight: "10")
+  in: [ProjectStatus!] @cost(weight: "10")
+  nin: [ProjectStatus!] @cost(weight: "10")
+}
+
+input StringOperationFilterInput {
+  and: [StringOperationFilterInput!]
+  or: [StringOperationFilterInput!]
+  eq: String @cost(weight: "10")
+  neq: String @cost(weight: "10")
+  contains: String @cost(weight: "20")
+  ncontains: String @cost(weight: "20")
+  in: [String] @cost(weight: "10")
+  nin: [String] @cost(weight: "10")
+  startsWith: String @cost(weight: "20")
+  nstartsWith: String @cost(weight: "20")
+  endsWith: String @cost(weight: "20")
+  nendsWith: String @cost(weight: "20")
+}
+
+input TaskItemFilterInput {
+  and: [TaskItemFilterInput!]
+  or: [TaskItemFilterInput!]
+  id: StringOperationFilterInput
+  projectId: StringOperationFilterInput
+  title: StringOperationFilterInput
+  description: StringOperationFilterInput
+  status: TaskItemStatusOperationFilterInput
+  priority: TaskPriorityOperationFilterInput
+  assigneeId: StringOperationFilterInput
+  dueDate: DateTimeOperationFilterInput
+  tags: ListStringOperationFilterInput
+  createdAt: DateTimeOperationFilterInput
+  updatedAt: DateTimeOperationFilterInput
+}
+
+input TaskItemSortInput {
+  id: SortEnumType @cost(weight: "10")
+  projectId: SortEnumType @cost(weight: "10")
+  title: SortEnumType @cost(weight: "10")
+  description: SortEnumType @cost(weight: "10")
+  status: SortEnumType @cost(weight: "10")
+  priority: SortEnumType @cost(weight: "10")
+  assigneeId: SortEnumType @cost(weight: "10")
+  dueDate: SortEnumType @cost(weight: "10")
+  createdAt: SortEnumType @cost(weight: "10")
+  updatedAt: SortEnumType @cost(weight: "10")
+}
+
+input TaskItemStatusOperationFilterInput {
+  eq: TaskItemStatus @cost(weight: "10")
+  neq: TaskItemStatus @cost(weight: "10")
+  in: [TaskItemStatus!] @cost(weight: "10")
+  nin: [TaskItemStatus!] @cost(weight: "10")
+}
+
+input TaskPriorityOperationFilterInput {
+  eq: TaskPriority @cost(weight: "10")
+  neq: TaskPriority @cost(weight: "10")
+  in: [TaskPriority!] @cost(weight: "10")
+  nin: [TaskPriority!] @cost(weight: "10")
+}
+
+input UpdateProjectInput {
+  id: String!
+  name: String!
+  description: String!
+  status: ProjectStatus!
+}
+
+input UpdateTaskInput {
+  id: String!
+  title: String!
+  description: String!
+  status: TaskItemStatus!
+  priority: TaskPriority!
+  assigneeId: String
+  dueDate: DateTime
+  tags: [String!]
+}
+
+input WorkspaceFilterInput {
+  and: [WorkspaceFilterInput!]
+  or: [WorkspaceFilterInput!]
+  id: StringOperationFilterInput
+  name: StringOperationFilterInput
+  ownerId: StringOperationFilterInput
+  createdAt: DateTimeOperationFilterInput
+}
+
+input WorkspaceSortInput {
+  id: SortEnumType @cost(weight: "10")
+  name: SortEnumType @cost(weight: "10")
+  ownerId: SortEnumType @cost(weight: "10")
+  createdAt: SortEnumType @cost(weight: "10")
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum SortEnumType {
+  ASC
+  DESC
+}
+
+enum TaskItemStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+"The `DateTime` scalar type represents a date and time with time zone offset information."
+scalar DateTime
+  @specifiedBy(url: "https://scalars.graphql.org/chillicream/date-time.html")
+
+"The purpose of the `cost` directive is to define a `weight` for GraphQL types, fields, and arguments. Static analysis can use these weights when calculating the overall cost of a query or response."
+directive @cost(
+  "The `weight` argument defines what value to add to the overall cost for every appearance, or possible appearance, of a type, field, argument, etc."
+  weight: String!
+) on
+  | SCALAR
+  | OBJECT
+  | FIELD_DEFINITION
+  | ARGUMENT_DEFINITION
+  | ENUM
+  | INPUT_FIELD_DEFINITION

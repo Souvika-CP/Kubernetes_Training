@@ -1,0 +1,17 @@
+{{- if .Values.serviceAccount.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "taskflow.fullname" . }}-reader
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "taskflow.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "taskflow.fullname" . }}-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "taskflow.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

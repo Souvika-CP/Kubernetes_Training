@@ -1,0 +1,20 @@
+TaskFlow has been deployed!
+
+API endpoint:
+  http://{{ .Values.ingress.host }}:8080
+
+Health checks:
+  http://{{ .Values.ingress.host }}:8080/health/live
+  http://{{ .Values.ingress.host }}:8080/health/ready
+
+GraphQL (Banana Cake Pop):
+  http://{{ .Values.ingress.host }}:8080/graphql
+
+Metrics (Prometheus):
+  http://{{ .Values.ingress.host }}:8080/metrics
+
+To check pod status:
+  kubectl get pods -n {{ .Release.Namespace }} -l app=taskflow-api
+
+To view logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app=taskflow-api --tail=50

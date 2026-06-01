@@ -1,0 +1,48 @@
+query GetProjects($workspaceId: String!) {
+  projects(workspaceId: $workspaceId) {
+    id
+    workspaceId
+    name
+    description
+    status
+    ownerId
+    createdAt
+  }
+}
+
+query GetProject($id: String!) {
+  project(id: $id) {
+    id
+    workspaceId
+    name
+    description
+    status
+    ownerId
+    createdAt
+  }
+}
+
+mutation CreateProject($input: CreateProjectInput!) {
+  createProject(input: $input) {
+    id
+    workspaceId
+    name
+    description
+    status
+    ownerId
+    createdAt
+  }
+}
+
+mutation UpdateProject($input: UpdateProjectInput!) {
+  updateProject(input: $input) {
+    id
+    name
+    description
+    status
+  }
+}
+
+mutation DeleteProject($id: String!) {
+  deleteProject(id: $id)
+}

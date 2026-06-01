@@ -1,0 +1,91 @@
+query GetTasks($projectId: String!) {
+  tasks(projectId: $projectId) {
+    id
+    projectId
+    title
+    description
+    status
+    priority
+    assigneeId
+    dueDate
+    tags
+    createdAt
+    updatedAt
+  }
+}
+
+query GetTask($id: String!) {
+  task(id: $id) {
+    id
+    projectId
+    title
+    description
+    status
+    priority
+    assigneeId
+    dueDate
+    tags
+    createdAt
+    updatedAt
+  }
+}
+
+mutation CreateTask($input: CreateTaskInput!) {
+  createTask(input: $input) {
+    id
+    projectId
+    title
+    status
+    priority
+    createdAt
+  }
+}
+
+mutation UpdateTask($input: UpdateTaskInput!) {
+  updateTask(input: $input) {
+    id
+    title
+    description
+    status
+    priority
+    assigneeId
+    dueDate
+    tags
+    updatedAt
+  }
+}
+
+mutation DeleteTask($id: String!) {
+  deleteTask(id: $id)
+}
+
+mutation AddComment($input: AddCommentInput!) {
+  addComment(input: $input) {
+    id
+    taskId
+    body
+    authorId
+    createdAt
+  }
+}
+
+subscription OnTaskUpdated($projectId: String!) {
+  onTaskUpdated(projectId: $projectId) {
+    id
+    projectId
+    title
+    status
+    priority
+    updatedAt
+  }
+}
+
+subscription OnCommentAdded($taskId: String!) {
+  onCommentAdded(taskId: $taskId) {
+    id
+    taskId
+    body
+    authorId
+    createdAt
+  }
+}

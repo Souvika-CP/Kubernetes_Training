@@ -1,0 +1,16 @@
+replicaCount: 1
+
+config:
+  environment: Development
+  logLevel: Debug
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+pdb:
+  enabled: false

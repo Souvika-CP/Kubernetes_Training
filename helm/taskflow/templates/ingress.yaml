@@ -1,0 +1,76 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "taskflow.fullname" . }}
+  labels:
+    {{- include "taskflow.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    # ── taskflow.local — API only (unchanged) ──────────────────────────────
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "taskflow.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+
+    {{- if .Values.frontend.enabled }}
+    # ── app.local — unified frontend + API ────────────────────────────────
+    # API paths listed first so they take priority over the / catch-all.
+    - host: {{ .Values.ingress.appHost | quote }}
+      http:
+        paths:
+          - path: /graphql
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "taskflow.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "taskflow.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "taskflow.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "taskflow.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+          - path: /metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "taskflow.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "taskflow.fullname" . }}-frontend
+                port:
+                  number: {{ .Values.frontend.service.port }}
+    {{- end }}
+{{- end }}
