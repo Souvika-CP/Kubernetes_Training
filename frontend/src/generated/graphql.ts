@@ -32,7 +32,6 @@ export type CreateTaskInput = {
 
 export type CreateWorkspaceInput = {
   name: string;
-  ownerId: string;
 };
 
 export type ProjectStatus =
