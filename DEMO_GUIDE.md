@@ -213,7 +213,29 @@ You'll see: 2 API pods, 1 frontend pod, 1 MongoDB pod, services, and an ingress 
 
 ---
 
-### Step 7: Register the demo users (first time only)
+### Step 7: Wait for all pods to be Ready
+
+MongoDB takes ~60–90 seconds to initialise on a fresh cluster. Wait before Step 8.
+
+```powershell
+kubectl get pods -n taskflow-dev -w
+```
+
+Wait until you see all pods showing `1/1 Running`:
+```
+NAME                                 READY   STATUS    RESTARTS
+mongodb-0                            1/1     Running   0
+taskflow-xxx                         1/1     Running   0
+taskflow-xxx                         1/1     Running   0
+taskflow-frontend-xxx                1/1     Running   0
+```
+Press `Ctrl+C` when all are Ready.
+
+> **Note:** `make deploy` may fail with a connection error on the very first attempt (Windows TCP quirk). Simply run `make deploy` a second time — it always succeeds on retry.
+
+---
+
+### Step 8: Register the demo users (first time only)
 
 ```powershell
 # Primary user
@@ -226,6 +248,44 @@ Invoke-RestMethod http://taskflow.local:8080/auth/register `
   -Method Post -ContentType "application/json" `
   -Body '{"name":"Alice","email":"alice@taskflow.local","password":"Test1234!"}'
 ```
+
+---
+
+### Step 9: Deploy the monitoring stack (first time only)
+
+```powershell
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --insecure-skip-tls-verify
+
+helm upgrade --install monitoring prometheus-community/kube-prometheus-stack `
+  -n monitoring --create-namespace `
+  -f k8s/monitoring/prometheus-values.yaml
+```
+
+Then apply Jaeger and the TaskFlow dashboard:
+
+```powershell
+kubectl apply -f k8s/monitoring/jaeger.yaml
+kubectl apply -f k8s/monitoring/dashboard-configmap.yaml
+kubectl apply -f k8s/monitoring/servicemonitor.yaml
+```
+
+Wait ~2 minutes for Grafana to start:
+```powershell
+kubectl get pods -n monitoring -w
+# Wait until monitoring-grafana-xxx shows 2/2 Running
+```
+
+> **Hosts file** — add these if not already there (requires Notepad as Administrator):
+> ```
+> 127.0.0.1 grafana.local
+> 127.0.0.1 jaeger.local
+> ```
+
+---
+
+### Step 10: Open the app
+
+**`http://app.local:8080`** → log in with `souvika@taskflow.local` / `Test1234!`
 
 ---
 
