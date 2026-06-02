@@ -702,6 +702,172 @@ The entire application is designed so that moving to AKS requires changing **onl
 
 ---
 
+# SLIDE 13b — Demo Part 9: Multi-Tenancy
+
+## Workspace Isolation in Action
+
+TaskFlow implements **shared-database row-level multi-tenancy**. Every workspace is an isolated tenant. Users can only see and act on workspaces they belong to — enforced at the GraphQL resolver layer using the JWT's `sub` claim.
+
+---
+
+### The Model
+
+```
+User (JWT identity)
+  │
+  └── WorkspaceMember (role: Owner | Editor | Viewer)
+            │
+            └── Workspace  ←── tenant boundary
+                  └── Project
+                        └── TaskItem
+```
+
+When a user creates a workspace they are **automatically added as Owner**. They must explicitly invite other users.
+
+---
+
+### Demo: Two Users, Separate Workspaces
+
+**Step 1 — Register the second test user**
+
+```powershell
+Invoke-RestMethod http://taskflow.local:8080/auth/register `
+  -Method Post -ContentType "application/json" `
+  -Body '{"name":"Alice","email":"alice@taskflow.local","password":"Test1234!"}'
+```
+
+**Step 2 — Get Alice's token**
+
+```powershell
+$alice = Invoke-RestMethod http://taskflow.local:8080/auth/token `
+  -Method Post -ContentType "application/json" `
+  -Body '{"email":"alice@taskflow.local","password":"Test1234!"}'
+$alice.token
+```
+
+**Step 3 — Open Banana Cake Pop at `http://taskflow.local:8080/graphql`**
+
+In the **Headers** tab add:
+```
+Authorization: Bearer <alice's token>
+```
+
+**Step 4 — Alice queries workspaces**
+
+```graphql
+{ workspaces { id name } }
+```
+
+Expected: empty list — Alice has no workspaces yet.
+
+**Step 5 — Alice creates her own workspace**
+
+```graphql
+mutation {
+  createWorkspace(input: { name: "Alice's Workspace" }) {
+    id name ownerId
+  }
+}
+```
+
+**Step 6 — Switch the token to Souvika's token (in the Headers tab)**
+
+Query workspaces as Souvika:
+```graphql
+{ workspaces { id name } }
+```
+
+Expected: Souvika sees only **her** workspaces — Alice's workspace is invisible.
+
+**Talking point:** This is the core multi-tenancy guarantee. Even though both users share the same database and the same API, each user's data is completely isolated from the other's. The filter is applied at the resolver level — Souvika's JWT `sub` claim is checked against the `workspace_members` collection before any data is returned.
+
+---
+
+### Demo: Inviting Alice to Souvika's Workspace
+
+**Step 1 — Get Alice's user ID (from Step 2 response above)**
+
+```powershell
+$alice.userId   # copy this
+```
+
+**Step 2 — As Souvika, add Alice as an Editor**
+
+```graphql
+mutation {
+  addWorkspaceMember(input: {
+    workspaceId: "<souvika's workspace id>",
+    userId: "<alice's userId>",
+    role: EDITOR
+  }) {
+    id
+    role
+    joinedAt
+  }
+}
+```
+
+**Step 3 — Switch back to Alice's token and query projects**
+
+```graphql
+{ projects(workspaceId: "<souvika's workspace id>") { id name } }
+```
+
+Expected: Alice can now see Souvika's projects.
+
+**Step 4 — Demonstrate FORBIDDEN for non-members**
+
+Remove Alice, then try querying again:
+```graphql
+mutation {
+  removeWorkspaceMember(input: {
+    workspaceId: "<souvika's workspace id>",
+    userId: "<alice's userId>"
+  })
+}
+```
+
+Alice queries projects → receives `FORBIDDEN` error.
+
+---
+
+### The Three Roles
+
+| Role | Can read data | Can create/update | Can manage members |
+|------|--------------|-------------------|--------------------|
+| **Owner** | Yes | Yes | Yes |
+| **Editor** | Yes | Yes | No |
+| **Viewer** | Yes | No | No |
+
+---
+
+### How It Works in the Code
+
+The enforcement is in the GraphQL resolvers — one pattern repeated for every workspace-scoped query:
+
+```csharp
+// Query.cs — GetProjects
+public async Task<IEnumerable<Project>> GetProjects(
+    string workspaceId,
+    [Service] IProjectRepository repo,
+    [Service] IWorkspaceMemberRepository memberRepo,
+    [Service] ICurrentUserService currentUser)    // ← reads JWT sub claim
+{
+    if (!await memberRepo.IsMemberAsync(workspaceId, currentUser.UserId))
+        throw new GraphQLException(
+            ErrorBuilder.New()
+                .SetMessage("Access denied to this workspace.")
+                .SetCode("FORBIDDEN")
+                .Build());
+
+    return await repo.GetByWorkspaceIdAsync(workspaceId);
+}
+```
+
+The `ICurrentUserService` reads the `sub` claim from the JWT in `HttpContext.User`. No JWT = `UNAUTHENTICATED` error. Valid JWT but not a member = `FORBIDDEN` error.
+
+---
+
 # SLIDE 14 — Summary
 
 ## What We Built and Why It Matters

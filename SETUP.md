@@ -468,19 +468,31 @@ Add-Content C:\Windows\System32\drivers\etc\hosts "`n127.0.0.1 jaeger.local"
 
 ---
 
-#### Step 6 — Register a user and log in
+#### Step 6 — Register test users and log in
 
 Open your browser: **`http://app.local:8080`**
 
-Register via the API (one time):
+Register two test users (run once — skip if already done):
 ```powershell
+# Primary user
 Invoke-RestMethod http://taskflow.local:8080/auth/register `
-  -Method Post `
-  -ContentType "application/json" `
-  -Body '{"name":"Your Name","email":"you@example.com","password":"Test1234!"}'
+  -Method Post -ContentType "application/json" `
+  -Body '{"name":"Souvika","email":"souvika@taskflow.local","password":"Test1234!"}'
+
+# Second user for multi-tenancy demo
+Invoke-RestMethod http://taskflow.local:8080/auth/register `
+  -Method Post -ContentType "application/json" `
+  -Body '{"name":"Alice","email":"alice@taskflow.local","password":"Test1234!"}'
 ```
 
-Then log in at `http://app.local:8080` with those credentials.
+Then log in at `http://app.local:8080` with either set of credentials.
+
+**Test Credentials:**
+
+| User | Email | Password | Role |
+|------|-------|----------|------|
+| Primary | `souvika@taskflow.local` | `Test1234!` | Workspace owner |
+| Second | `alice@taskflow.local` | `Test1234!` | Invited member |
 
 ---
 

@@ -4,11 +4,14 @@
 
 ### 1.1 Entity Hierarchy
 ```
-Workspace (1)
-  └─ Project (*) [workspaceId FK]
-       └─ TaskItem (*) [projectId FK]
-            └─ Comment (*) [taskId FK]
-User (independent — referenced by ownerId, assigneeId, authorId)
+User  ──────────────────────────────────────────┐
+  │                                             │ (ownerId, assigneeId, authorId)
+  └── WorkspaceMember (role: Owner|Editor|Viewer)
+            │
+            └── Workspace  ← tenant boundary
+                  └── Project (*) [workspaceId FK]
+                        └── TaskItem (*) [projectId FK]
+                              └── Comment (*) [taskId FK]
 ```
 
 ### 1.2 Entity Definitions
@@ -64,6 +67,15 @@ string Email
 string PasswordHash  // BCrypt hash — [GraphQLIgnore]
 UserRole Role        // Admin | Member
 DateTime CreatedAt   // init-only
+```
+
+**WorkspaceMember**
+```csharp
+string Id
+string WorkspaceId          // FK → Workspace (tenant boundary)
+string UserId               // FK → User
+WorkspaceMemberRole Role    // Owner | Editor | Viewer
+DateTime JoinedAt           // init-only
 ```
 
 ### 1.3 Enum Conventions

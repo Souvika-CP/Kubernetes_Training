@@ -105,6 +105,11 @@ builder.Services.AddSingleton<IProjectRepository, ProjectRepository>();
 builder.Services.AddSingleton<ITaskRepository, TaskRepository>();
 builder.Services.AddSingleton<ICommentRepository, CommentRepository>();
 builder.Services.AddSingleton<IUserRepository, UserRepository>();
+builder.Services.AddSingleton<IWorkspaceMemberRepository, WorkspaceMemberRepository>();
+
+// Current user (reads JWT sub claim from HttpContext)
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 var app = builder.Build();
 

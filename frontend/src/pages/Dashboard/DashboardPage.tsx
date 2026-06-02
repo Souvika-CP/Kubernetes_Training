@@ -242,7 +242,7 @@ export default function DashboardPage() {
   async function handleCreateWorkspace(e: FormEvent) {
     e.preventDefault()
     if (!newWorkspaceName.trim()) return
-    await createWorkspace({ variables: { input: { name: newWorkspaceName.trim(), ownerId: user!.userId } } })
+    await createWorkspace({ variables: { input: { name: newWorkspaceName.trim() } } })
   }
   async function handleCreateProject(e: FormEvent) {
     e.preventDefault()

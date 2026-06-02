@@ -15,3 +15,17 @@ mutation CreateWorkspace($input: CreateWorkspaceInput!) {
     createdAt
   }
 }
+
+mutation AddWorkspaceMember($input: AddWorkspaceMemberInput!) {
+  addWorkspaceMember(input: $input) {
+    id
+    workspaceId
+    userId
+    role
+    joinedAt
+  }
+}
+
+mutation RemoveWorkspaceMember($input: RemoveWorkspaceMemberInput!) {
+  removeWorkspaceMember(input: $input)
+}
