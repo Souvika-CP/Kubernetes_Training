@@ -102,7 +102,17 @@ Docker Compose runs containers, but it has no concept of self-healing, rolling u
 ### Step 2: Fix the cluster connection
 
 ```powershell
-kubectl config set-cluster k3d-taskflow --server="https://127.0.0.1:65165"
+make kubeconfig
+```
+
+If `make` is not available, run manually. First find the API server port:
+```powershell
+docker ps --filter "name=k3d-taskflow-serverlb" --format "{{.Ports}}"
+# Look for the port mapped to 6443, e.g. 0.0.0.0:65165->6443/tcp  ← 65165 is the port
+```
+Then patch kubectl:
+```powershell
+kubectl config set-cluster k3d-taskflow --server="https://127.0.0.1:<port-from-above>"
 kubectl config set-cluster k3d-taskflow --insecure-skip-tls-verify=true
 ```
 
@@ -161,16 +171,38 @@ The final image has no compiler, no source code — only what's needed to run. T
 
 ---
 
-### Step 5: Deploy with Helm
+### Step 5: First-time secrets setup
 
+The `values.local.yaml` file holds credentials and is gitignored (never committed). Copy the example file once before first deploy:
+
+```powershell
+cp helm/taskflow/values.local.yaml.example helm/taskflow/values.local.yaml
+```
+
+The example already contains the correct training credentials — no editing needed for local k3d.
+
+---
+
+### Step 6: Deploy with Helm
+
+```powershell
+make deploy
+```
+
+Or manually (two values files — base config + local secrets):
 ```powershell
 helm upgrade --install taskflow helm/taskflow `
   -n taskflow-dev --create-namespace `
-  -f helm/taskflow/values.yaml
+  -f helm/taskflow/values.yaml `
+  -f helm/taskflow/values.local.yaml `
+  --set image.tag=v2
 ```
 
 **What is Helm?**
 Helm is the package manager for Kubernetes — like `apt` for Ubuntu or `npm` for Node.js. Instead of applying 15 separate YAML files manually, Helm bundles them into a **chart** and deploys everything in one command. It also tracks versions and enables one-command rollbacks.
+
+**Why two values files?**
+`values.yaml` contains all safe config (committed to git). `values.local.yaml` contains credentials (gitignored — lives only on your machine). Helm merges them at deploy time. This is how real teams separate config from secrets.
 
 **What gets created?**
 ```powershell
@@ -178,6 +210,22 @@ kubectl get all -n taskflow-dev
 ```
 
 You'll see: 2 API pods, 1 frontend pod, 1 MongoDB pod, services, and an ingress — all from a single Helm command.
+
+---
+
+### Step 7: Register the demo users (first time only)
+
+```powershell
+# Primary user
+Invoke-RestMethod http://taskflow.local:8080/auth/register `
+  -Method Post -ContentType "application/json" `
+  -Body '{"name":"Souvika","email":"souvika@taskflow.local","password":"Test1234!"}'
+
+# Second user (for multi-tenancy demo in Slide 13b)
+Invoke-RestMethod http://taskflow.local:8080/auth/register `
+  -Method Post -ContentType "application/json" `
+  -Body '{"name":"Alice","email":"alice@taskflow.local","password":"Test1234!"}'
+```
 
 ---
 
@@ -439,6 +487,7 @@ With 1 replica, any restart means downtime. With 2, one pod handles traffic whil
 helm upgrade taskflow helm/taskflow `
   -n taskflow-dev `
   -f helm/taskflow/values.yaml `
+  -f helm/taskflow/values.local.yaml `
   --set image.tag=v2
 
 # Watch it roll out
@@ -655,8 +704,14 @@ These settings implement the **principle of least privilege**: the container can
 
 ```powershell
 # Show what changes between dev and prod
-helm template taskflow helm/taskflow -f helm/taskflow/values.yaml > dev-output.yaml
-helm template taskflow helm/taskflow -f helm/taskflow/values.prod.yaml > prod-output.yaml
+helm template taskflow helm/taskflow `
+  -f helm/taskflow/values.yaml `
+  -f helm/taskflow/values.local.yaml > dev-output.yaml
+
+helm template taskflow helm/taskflow `
+  -f helm/taskflow/values.yaml `
+  -f helm/taskflow/values.local.yaml `
+  -f helm/taskflow/values.prod.yaml > prod-output.yaml
 ```
 
 **Key differences (open both files side by side):**
@@ -906,9 +961,8 @@ The `ICurrentUserService` reads the `sub` claim from the JWT in `HttpContext.Use
 # Start cluster
 k3d cluster create --config k3d-config.yaml
 
-# Fix kubectl connection after restart
-kubectl config set-cluster k3d-taskflow --server="https://127.0.0.1:65165"
-kubectl config set-cluster k3d-taskflow --insecure-skip-tls-verify=true
+# Fix kubectl connection after restart (port may differ — check with: docker ps --filter "name=serverlb" --format "{{.Ports}}")
+make kubeconfig
 
 # Stop cluster (preserves data)
 k3d cluster stop taskflow
@@ -970,7 +1024,7 @@ helm history taskflow -n taskflow-dev
 helm rollback taskflow 2 -n taskflow-dev
 
 # Dry run (preview what would change)
-helm upgrade taskflow helm/taskflow -n taskflow-dev -f helm/taskflow/values.yaml --dry-run
+helm upgrade taskflow helm/taskflow -n taskflow-dev -f helm/taskflow/values.yaml -f helm/taskflow/values.local.yaml --dry-run
 ```
 
 ## URLs (once cluster is running)
@@ -1372,6 +1426,7 @@ Everything in this checklist is a **configuration change only** — zero applica
 [ ] Deploy with same Helm command
       helm upgrade --install taskflow helm/taskflow \
         -n taskflow-dev --create-namespace \
+        -f helm/taskflow/values.yaml \
         -f helm/taskflow/values.prod.yaml
 ```
 
