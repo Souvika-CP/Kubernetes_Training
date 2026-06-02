@@ -1033,3 +1033,199 @@ Running MongoDB as a StatefulSet was a deliberate training choice. It taught:
 All of these concepts apply to any stateful workload in Kubernetes — not just MongoDB. The patterns transfer directly to running Redis, RabbitMQ, Elasticsearch, or any database in-cluster when that genuinely makes sense.
 
 The architecture was also designed from day one so the switch to a managed service requires changing **one line** — the connection string. That's the right way to build it.
+
+---
+
+---
+
+# APPENDIX C — How k3d Maps to Real Kubernetes (AKS)
+
+## The Core Concept
+
+k3d and AKS run the **same Kubernetes API**. Every `kubectl` command, every YAML manifest, every Helm chart works identically on both. The difference is entirely in the infrastructure layer underneath — what is running the nodes, what provides storage, what handles networking.
+
+> Think of k3d like a flight simulator. The controls are identical to a real cockpit. Everything you learn carries over. But there's no actual plane.
+
+---
+
+## Component-by-Component Mapping
+
+| Concern | k3d (local training) | AKS (real Azure) | Same? |
+|---------|---------------------|-----------------|-------|
+| **Kubernetes API** | k3s (lightweight Kubernetes) | Full upstream Kubernetes | ✅ Identical |
+| **kubectl commands** | `kubectl get pods`, `kubectl apply` | Same commands | ✅ Identical |
+| **Helm charts** | `helm upgrade --install` | Same command | ✅ Identical |
+| **YAML manifests** | Deployments, Services, Ingress, etc. | Same resources | ✅ Identical |
+| **Nodes** | Docker containers on your laptop | Azure VMs (Standard_D2s_v3 etc.) | ⚠️ Same concept, different substrate |
+| **Networking** | Docker virtual network | Azure VNet | ⚠️ Same concept, different substrate |
+| **Load balancer** | k3d port-forward (localhost:8080) | Azure Load Balancer (public IP) | ⚠️ Same concept, different substrate |
+| **Image registry** | Local Docker registry (localhost:5050) | Azure Container Registry (ACR) | ⚠️ Same concept, different URL |
+| **Ingress controller** | Traefik (pre-installed in k3s) | NGINX or Azure App Gateway (you install) | ⚠️ Same concept, different controller |
+| **Storage** | local-path provisioner (node disk) | Azure Managed Disks (CSI driver) | ⚠️ Same concept, different StorageClass |
+| **Secrets** | k8s Secrets (base64 encoded only) | Azure Key Vault + Secrets Store CSI | ⚠️ Same concept, better security |
+| **Monitoring** | Self-hosted Prometheus + Grafana | Azure Monitor managed Prometheus | ⚠️ Same concept, managed by Azure |
+| **Tracing** | Jaeger (self-hosted) | Azure Application Insights | ⚠️ Same OTLP protocol, different backend |
+| **DNS** | `/etc/hosts` file (manual) | Azure DNS or custom domain | ⚠️ Same concept, real DNS |
+
+---
+
+## What Is k3s?
+
+k3d wraps **k3s** — a certified, lightweight Kubernetes distribution made by Rancher (now SUSE). It is the same Kubernetes distribution that AKS uses for its nodes internally. It passes the full Kubernetes conformance test suite, which means:
+
+- All standard Kubernetes resources work (Pod, Deployment, Service, Ingress, etc.)
+- All standard APIs work (`apps/v1`, `networking.k8s.io/v1`, etc.)
+- RBAC, NetworkPolicy, PersistentVolumes — all supported
+
+The "lightweight" part means k3s removes some rarely-used features (legacy APIs, cloud-provider integrations) to reduce binary size from ~500MB to ~100MB. None of those removals affect anything in this project.
+
+---
+
+## What k3d Adds on Top of k3s
+
+k3d is a wrapper that runs k3s nodes as **Docker containers** instead of real VMs:
+
+```
+Your machine
+└── Docker
+    ├── k3d-taskflow-server-0   (container running k3s control plane)
+    ├── k3d-taskflow-agent-0    (container running k3s worker node)
+    ├── k3d-taskflow-agent-1    (container running k3s worker node)
+    ├── k3d-taskflow-serverlb   (container running HAProxy load balancer)
+    └── taskflow-registry       (container running Docker registry)
+```
+
+Each "node" is a Docker container. Kubernetes thinks it's managing real machines. The Kubernetes scheduler places pods on these containers exactly as it would on real VMs.
+
+---
+
+## The Kubernetes API Is Standardised
+
+This is the key insight. The Kubernetes API is an open standard — the same spec governs k3s, AKS, EKS (AWS), GKE (Google), and a dozen other distributions. CNCF certification requires passing a conformance test suite.
+
+When you run:
+```powershell
+kubectl apply -f deployment.yaml
+```
+
+That command sends an HTTP request to the Kubernetes API server. It doesn't matter whether that API server is running in Docker on your laptop or in Azure's data centre. The request format, the resource schema, the response — all identical.
+
+---
+
+## The Three Differences That Actually Matter in Production
+
+### 1. Node autoscaling
+
+k3d has a fixed number of nodes (you set it in `k3d-config.yaml`).
+AKS has a **Cluster Autoscaler** that adds/removes Azure VMs based on pending pods.
+
+```yaml
+# AKS node pool with autoscaler
+az aks nodepool add \
+  --cluster-name taskflow \
+  --name workerpool \
+  --enable-cluster-autoscaler \
+  --min-count 2 \
+  --max-count 10
+```
+
+Nothing in our application code changes — Kubernetes handles this transparently.
+
+---
+
+### 2. Storage classes
+
+k3d uses `local-path` — data is stored on the node's local disk. If a node container is recreated, data is gone.
+
+AKS provides Azure Managed Disks via the `managed-csi` StorageClass:
+
+```yaml
+# k3d (values.yaml) — local-path is the default
+volumeClaimTemplates:
+  - spec:
+      storageClassName: ""   # uses cluster default (local-path)
+
+# AKS (values.prod.yaml) — Azure Disk
+volumeClaimTemplates:
+  - spec:
+      storageClassName: "managed-csi"
+      resources:
+        requests:
+          storage: 10Gi
+```
+
+Azure Managed Disks are network-attached — the pod can move to any node and remount the same disk. Local-path cannot do this.
+
+---
+
+### 3. Identity and secrets
+
+k3d uses base64-encoded Kubernetes Secrets. Any user with `kubectl get secret` can decode them.
+
+AKS integrates with **Azure Workload Identity** and **Azure Key Vault**:
+
+```yaml
+# AKS — pod identity annotation (no secrets in Kubernetes at all)
+spec:
+  serviceAccountName: taskflow-api
+  # Pod authenticates to Azure AD using its service account token
+  # Azure AD issues an access token to reach Key Vault
+  # Key Vault serves the secret directly to the container
+```
+
+The application code does not change — it still reads `MongoDb__ConnectionString` from environment variables. The difference is how that environment variable gets populated: from a k8s Secret (local) vs from Key Vault via the CSI driver (AKS).
+
+---
+
+## The Migration Checklist: k3d → AKS
+
+Everything in this checklist is a **configuration change only** — zero application code changes:
+
+```
+[ ] Create AKS cluster
+      az aks create --name taskflow --resource-group rg-taskflow \
+        --node-count 3 --enable-cluster-autoscaler \
+        --min-count 2 --max-count 10
+
+[ ] Get credentials
+      az aks get-credentials --name taskflow --resource-group rg-taskflow
+
+[ ] Create Azure Container Registry and push images
+      az acr create --name taskflowacr --sku Basic
+      az acr build --registry taskflowacr --image taskflow:v2 .
+
+[ ] Update values.prod.yaml
+      image.repository: taskflowacr.azurecr.io/taskflow
+      ingress.className: nginx  (or azure-application-gateway)
+      ingress.host: taskflow.yourdomain.com
+      mongodb.connectionString: <Cosmos DB or Atlas URL>
+
+[ ] Install NGINX Ingress Controller (Traefik not pre-installed on AKS)
+      helm install ingress-nginx ingress-nginx/ingress-nginx
+
+[ ] Deploy with same Helm command
+      helm upgrade --install taskflow helm/taskflow \
+        -n taskflow-dev --create-namespace \
+        -f helm/taskflow/values.prod.yaml
+```
+
+That's it. The `kubectl get pods`, `kubectl logs`, `helm rollback` — all work exactly the same.
+
+---
+
+## Why This Matters for Learning
+
+Every concept practiced on k3d is directly transferable:
+
+| What you practised | What it becomes in AKS |
+|--------------------|------------------------|
+| `kubectl get pods` | Same command, same output |
+| Rolling update (`helm upgrade`) | Same command, Kubernetes handles it on real VMs |
+| Health probes (live/ready/startup) | Same probe config, AKS respects them identically |
+| NetworkPolicy | Works unchanged — AKS supports it natively |
+| ResourceQuota + LimitRange | Works unchanged |
+| PodDisruptionBudget | More important in AKS (real node maintenance windows) |
+| Helm environment overlays | Same pattern — just different values files |
+| Prometheus ServiceMonitor | Same CRD, works with Azure Monitor's managed Prometheus |
+
+The only things that change are the addresses and credentials pointing to Azure-managed infrastructure. The Kubernetes layer itself is identical.
