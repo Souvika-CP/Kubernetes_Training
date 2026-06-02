@@ -49,7 +49,7 @@ config:
   jwtIssuer: taskflow-api
   jwtAudience: taskflow-clients
   jwtExpiryMinutes: "60"
-  jwtKey: "taskflow-dev-secret-key-change-in-production-32chars"
+  jwtKey: "REPLACE_IN_VALUES_LOCAL_YAML"
 
 otel:
   endpoint: "http://jaeger.monitoring.svc.cluster.local:4317"
@@ -59,7 +59,7 @@ pdb:
   minAvailable: 1
 
 mongodb:
-  connectionString: "mongodb://admin:<password>@mongodb:27017/taskflow?authSource=admin"
+  connectionString: "REPLACE_IN_VALUES_LOCAL_YAML"
   databaseName: taskflow
 
 livenessProbe:

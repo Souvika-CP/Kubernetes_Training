@@ -15,6 +15,7 @@ appsettings.*.local.json
 secrets.yaml
 *.pfx
 *.p12
+helm/taskflow/values.local.yaml
 
 # ── Node / Frontend ───────────────────────────────────────────────────────────
 frontend/node_modules/

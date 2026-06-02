@@ -1,0 +1,20 @@
+# ── Local secrets override ────────────────────────────────────────────────────
+# Copy this file to values.local.yaml and fill in the values.
+# values.local.yaml is gitignored — it never gets committed.
+#
+# Usage:
+#   helm upgrade --install taskflow helm/taskflow \
+#     -n taskflow-dev --create-namespace \
+#     -f helm/taskflow/values.yaml \
+#     -f helm/taskflow/values.local.yaml
+#
+# Or just: make deploy  (Makefile handles this automatically)
+
+mongodb:
+  # For local k3d dev — use the MongoDB StatefulSet inside the cluster
+  connectionString: "mongodb://admin:mongopassword@mongodb:27017/taskflow?authSource=admin"
+  databaseName: taskflow
+
+config:
+  # JWT signing key — min 32 characters, keep secret
+  jwtKey: "taskflow-dev-secret-key-change-in-production-32chars"

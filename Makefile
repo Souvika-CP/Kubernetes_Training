@@ -10,6 +10,7 @@ NAMESPACE        := taskflow-dev
 HELM_RELEASE     := taskflow
 HELM_CHART       := helm/taskflow
 HELM_VALUES      := helm/taskflow/values.yaml
+HELM_SECRETS     := helm/taskflow/values.local.yaml
 SOLUTION         := TaskFlow.slnx
 K3D_CLUSTER      := taskflow
 
@@ -104,6 +105,7 @@ deploy: kubeconfig
 	helm upgrade --install $(HELM_RELEASE) $(HELM_CHART) \
 		-n $(NAMESPACE) --create-namespace \
 		-f $(HELM_VALUES) \
+		-f $(HELM_SECRETS) \
 		--set image.tag=$(IMAGE_TAG)
 
 .PHONY: rollback
