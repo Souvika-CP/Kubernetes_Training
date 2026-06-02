@@ -59,7 +59,7 @@ pdb:
   minAvailable: 1
 
 mongodb:
-  connectionString: "mongodb://admin:mongopassword@mongodb:27017/taskflow?authSource=admin"
+  connectionString: "mongodb://admin:<password>@mongodb:27017/taskflow?authSource=admin"
   databaseName: taskflow
 
 livenessProbe:

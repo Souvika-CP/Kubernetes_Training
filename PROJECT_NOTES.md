@@ -927,7 +927,7 @@ A normal Service has a virtual IP (ClusterIP) that load-balances across pods. A 
 - `mongodb-0.mongodb.taskflow-dev.svc.cluster.local` → mongodb-0 pod IP
 - `mongodb-1.mongodb.taskflow-dev.svc.cluster.local` → mongodb-1 pod IP (if scaled)
 
-The API connects to just `mongodb://admin:mongopassword@mongodb:27017/taskflow?authSource=admin` — the headless service name resolves to the pod's IP.
+The API connects to just `mongodb://admin:<password>@mongodb:27017/taskflow?authSource=admin` — the headless service name resolves to the pod's IP.
 
 **`volumeClaimTemplates` — how persistent storage works:**
 ```yaml
@@ -945,10 +945,10 @@ k3d includes the `local-path` storage provisioner. When the StatefulSet creates 
 **MongoDB auth:**
 Root credentials are stored in `k8s/mongodb/secret.yaml`:
 - Username: `admin`
-- Password: `mongopassword` (base64: `bW9uZ29wYXNzd29yZA==`)
+- Password: set to a value of your choice, base64-encoded (training project used a simple dev password — replace for any real deployment)
 
 The API connection string was updated in `k8s/api/secret.yaml` to:
-`mongodb://admin:mongopassword@mongodb:27017/taskflow?authSource=admin`
+`mongodb://admin:<password>@mongodb:27017/taskflow?authSource=admin`
 
 `authSource=admin` tells the driver to authenticate against the `admin` database (where the root user lives), while the data goes into the `taskflow` database.
 
@@ -962,7 +962,7 @@ kubectl rollout status deployment/taskflow-api -n taskflow-dev
 **Verifying:**
 ```powershell
 # Ping MongoDB from inside the pod
-kubectl exec -n taskflow-dev mongodb-0 -- mongosh --username admin --password mongopassword --authenticationDatabase admin --eval "db.adminCommand('ping')"
+kubectl exec -n taskflow-dev mongodb-0 -- mongosh --username admin --password <your-password> --authenticationDatabase admin --eval "db.adminCommand('ping')"
 # Expected: { ok: 1 }
 
 # Check API can reach MongoDB
@@ -1523,7 +1523,7 @@ metadata:
 True MongoDB connection pool metrics require the `mongodb-exporter` sidecar (Percona's mongodb_exporter). Without it, we use container memory and CPU as a reasonable proxy — high memory and sustained CPU on the MongoDB container correlates with connection pool pressure. To add the real metric later:
 ```bash
 helm install mongodb-exporter prometheus-community/prometheus-mongodb-exporter \
-  --set mongodb.uri="mongodb://admin:mongopassword@mongodb.taskflow-dev.svc:27017" \
+  --set mongodb.uri="mongodb://admin:<password>@mongodb.taskflow-dev.svc:27017" \
   -n taskflow-dev
 ```
 Then the metric `mongodb_ss_connections{state="current"}` becomes available.

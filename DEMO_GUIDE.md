@@ -1088,17 +1088,17 @@ The `MongoDB.Driver` in .NET does not care whether it connects to a pod in the s
 ```yaml
 # BEFORE (in-cluster StatefulSet)
 mongodb:
-  connectionString: "mongodb://admin:mongopassword@mongodb:27017/taskflow?authSource=admin"
+  connectionString: "mongodb://admin:<password>@mongodb:27017/taskflow?authSource=admin"
   databaseName: taskflow
 
 # AFTER — Azure Cosmos DB for MongoDB
 mongodb:
-  connectionString: "mongodb://taskflow:YOUR_KEY@taskflow.mongo.cosmos.azure.com:10255/taskflow?ssl=true&replicaSet=globaldb&retrywrites=false"
+  connectionString: "mongodb://<account>:<primary-key>@<account>.mongo.cosmos.azure.com:10255/taskflow?ssl=true&replicaSet=globaldb&retrywrites=false"
   databaseName: taskflow
 
 # AFTER — MongoDB Atlas
 mongodb:
-  connectionString: "mongodb+srv://taskflowuser:YOUR_PASSWORD@cluster0.abc123.mongodb.net/taskflow?retryWrites=true&w=majority"
+  connectionString: "mongodb+srv://<username>:<password>@<cluster-id>.mongodb.net/taskflow?retryWrites=true&w=majority"
   databaseName: taskflow
 ```
 

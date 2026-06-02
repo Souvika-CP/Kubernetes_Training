@@ -561,7 +561,7 @@ config:
 otel:
   endpoint: "http://jaeger.monitoring.svc.cluster.local:4317"
 mongodb:
-  connectionString: "mongodb://admin:<pass>@mongodb:27017/taskflow?authSource=admin"
+  connectionString: "mongodb://admin:<password>@mongodb:27017/taskflow?authSource=admin"
   databaseName: taskflow
 autoscaling:
   enabled: false
