@@ -127,5 +127,6 @@ clean: kubeconfig
 # ─── Shortcuts ────────────────────────────────────────────────────────────────
 .PHONY: release
 release: docker-build docker-push deploy
+	kubectl rollout restart deployment/$(HELM_RELEASE) -n $(NAMESPACE)
 
 .DEFAULT_GOAL := help

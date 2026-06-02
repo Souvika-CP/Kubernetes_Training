@@ -40,6 +40,8 @@ builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"))
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // Keep JWT claim names as-is (e.g. "sub" stays "sub", not remapped to NameIdentifier)
+        options.MapInboundClaims = false;
         var jwt = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
         options.TokenValidationParameters = new TokenValidationParameters
         {
