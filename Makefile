@@ -93,10 +93,10 @@ frontend-push:
 frontend-release: frontend-build frontend-push deploy
 
 # ─── Kubernetes helpers ───────────────────────────────────────────────────────
-# Run after cluster restart — dynamically finds the API server port from Docker
+# Run after cluster restart — reads the port from k3d's own kubeconfig output
 .PHONY: kubeconfig
 kubeconfig:
-	$(eval PORT := $(shell docker port k3d-taskflow-serverlb 6443 2>/dev/null | cut -d: -f2))
+	$(eval PORT := $(shell k3d kubeconfig get taskflow | grep server | grep -oE '[0-9]{4,5}$$'))
 	kubectl config set-cluster k3d-taskflow --server="https://127.0.0.1:$(PORT)"
 	kubectl config set-cluster k3d-taskflow --insecure-skip-tls-verify=true
 
