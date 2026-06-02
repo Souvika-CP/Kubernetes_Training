@@ -93,11 +93,13 @@ frontend-push:
 frontend-release: frontend-build frontend-push deploy
 
 # ─── Kubernetes helpers ───────────────────────────────────────────────────────
-# Run after cluster restart — reads the port from k3d's own kubeconfig output
+# Run after cluster restart — reads the port from k3d's own kubeconfig output.
+# Runs in bash (SHELL := bash above), so grep is available.
 .PHONY: kubeconfig
 kubeconfig:
-	$(eval PORT := $(shell k3d kubeconfig get taskflow | grep server | grep -oE '[0-9]{4,5}$$'))
-	kubectl config set-cluster k3d-taskflow --server="https://127.0.0.1:$(PORT)"
+	@PORT=$$(k3d kubeconfig get taskflow | grep server | grep -oE '[0-9]{4,5}'); \
+	echo "API server port: $$PORT"; \
+	kubectl config set-cluster k3d-taskflow --server="https://127.0.0.1:$$PORT"; \
 	kubectl config set-cluster k3d-taskflow --insecure-skip-tls-verify=true
 
 # ─── Helm ─────────────────────────────────────────────────────────────────────
