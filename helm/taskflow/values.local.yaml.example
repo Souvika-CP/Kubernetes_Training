@@ -13,6 +13,7 @@
 mongodb:
   # For local k3d dev — use the MongoDB StatefulSet inside the cluster
   connectionString: "mongodb://admin:mongopassword@mongodb:27017/taskflow?authSource=admin"
+  rootPassword: "mongopassword"
   databaseName: taskflow
 
 config:

@@ -59,7 +59,9 @@ pdb:
   minAvailable: 1
 
 mongodb:
+  image: mongo:7
   connectionString: "REPLACE_IN_VALUES_LOCAL_YAML"
+  rootPassword: "REPLACE_IN_VALUES_LOCAL_YAML"
   databaseName: taskflow
 
 livenessProbe:
