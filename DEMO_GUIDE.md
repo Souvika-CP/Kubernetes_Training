@@ -127,6 +127,8 @@ k3d writes the API server address as `host.docker.internal`, which doesn't alway
 kubectl get nodes
 ```
 
+> **Note:** The first attempt may show a transient connection error — just run it again. This is a Windows TCP quirk and always resolves on retry.
+
 **Expected output:**
 ```
 NAME                    STATUS   ROLES                  AGE   VERSION
@@ -156,7 +158,7 @@ A Docker image is a packaged, self-contained snapshot of an application and all 
 
 | Image | Contents | Size |
 |-------|----------|------|
-| `taskflow:v2` | .NET 10 runtime + compiled API binary | ~152 MB |
+| `taskflow:v1` | .NET 10 runtime + compiled API binary | ~152 MB |
 | `taskflow-frontend:v1` | nginx + compiled React app (HTML/JS/CSS) | ~25 MB |
 
 **Why two separate images?**
@@ -189,13 +191,15 @@ The example already contains the correct training credentials — no editing nee
 make deploy
 ```
 
+> **Note:** The first attempt sometimes fails with a connection error (Windows TCP quirk). Run `make deploy` a second time — it always succeeds on retry.
+
 Or manually (two values files — base config + local secrets):
 ```powershell
 helm upgrade --install taskflow helm/taskflow `
   -n taskflow-dev --create-namespace `
   -f helm/taskflow/values.yaml `
   -f helm/taskflow/values.local.yaml `
-  --set image.tag=v2
+  --set image.tag=v1
 ```
 
 **What is Helm?**
@@ -230,8 +234,6 @@ taskflow-xxx                         1/1     Running   0
 taskflow-frontend-xxx                1/1     Running   0
 ```
 Press `Ctrl+C` when all are Ready.
-
-> **Note:** `make deploy` may fail with a connection error on the very first attempt (Windows TCP quirk). Simply run `make deploy` a second time — it always succeeds on retry.
 
 ---
 
@@ -1018,19 +1020,19 @@ The `ICurrentUserService` reads the `sub` claim from the JWT in `HttpContext.Use
 
 ## Cluster Management
 ```powershell
-# Start cluster
+# Create cluster (fresh start — all data lost)
 k3d cluster create --config k3d-config.yaml
+make kubeconfig        # always run after create
+kubectl get nodes      # verify — retry if first attempt errors
 
-# Fix kubectl connection after restart (port may differ — check with: docker ps --filter "name=serverlb" --format "{{.Ports}}")
-make kubeconfig
-
-# Stop cluster (preserves data)
+# Stop cluster (preserves PVC data — MongoDB survives)
 k3d cluster stop taskflow
 
-# Start cluster again
+# Start cluster again (data preserved)
 k3d cluster start taskflow
+make kubeconfig        # run after every start — port may change
 
-# Delete cluster entirely
+# Delete cluster entirely (all data lost)
 k3d cluster delete taskflow
 ```
 
@@ -1062,8 +1064,8 @@ kubectl get all -n taskflow-dev
 # Watch pods in real time
 kubectl get pods -n taskflow-dev -w
 
-# Tail API logs
-kubectl logs -n taskflow-dev -l app.kubernetes.io/name=taskflow --follow --tail=50
+# Tail API logs (app=taskflow-api targets only the API, not the frontend)
+kubectl logs -n taskflow-dev -l app=taskflow-api --follow --tail=50
 
 # Describe a pod (events, resource usage, probe status)
 kubectl describe pod <pod-name> -n taskflow-dev
@@ -1091,7 +1093,7 @@ helm upgrade taskflow helm/taskflow -n taskflow-dev -f helm/taskflow/values.yaml
 | URL | What it shows |
 |-----|---------------|
 | `http://app.local:8080` | React frontend |
-| `http://taskflow.local:8080/graphql` | GraphQL IDE (Banana Cake Pop) |
+| `http://taskflow.local:8080/graphql` | GraphQL IDE (Banana Cake Pop) — requires Bearer token, see below |
 | `http://taskflow.local:8080/health/ready` | Health check |
 | `http://taskflow.local:8080/metrics` | Prometheus metrics (raw) |
 | `http://grafana.local:8080` | Grafana dashboards (admin/admin) |
@@ -1102,6 +1104,43 @@ helm upgrade taskflow helm/taskflow -n taskflow-dev -f helm/taskflow/values.yaml
 |-|-------|
 | Email | `souvika@taskflow.local` |
 | Password | `Test1234!` |
+
+## GraphQL Queries (Banana Cake Pop)
+
+Open `http://taskflow.local:8080/graphql`. All workspace/project queries require a token.
+
+**Get a token:**
+```powershell
+$t = Invoke-RestMethod http://taskflow.local:8080/auth/token `
+  -Method Post -ContentType "application/json" `
+  -Body '{"email":"souvika@taskflow.local","password":"Test1234!"}'
+$t.token   # copy this value
+```
+
+**Set the token in Banana Cake Pop:**
+1. Click the **Headers** tab at the bottom of the document
+2. Add key: `Authorization`  value: `Bearer <paste token here>`
+
+**Useful queries:**
+```graphql
+# See your workspaces
+{ workspaces { id name ownerId createdAt } }
+
+# See projects in a workspace
+{ projects(workspaceId: "<id>") { id name status } }
+
+# See tasks in a project
+{ tasks(projectId: "<id>") { id title status priority } }
+```
+
+**Create a workspace:**
+```graphql
+mutation {
+  createWorkspace(input: { name: "My Workspace" }) {
+    id name ownerId
+  }
+}
+```
 
 ---
 
